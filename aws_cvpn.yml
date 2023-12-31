@@ -1,0 +1,229 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation Template for deploying AWS Client VPN
+
+Resources:
+  VPC3:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.4.0.0/16
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name 
+          Value: INSPECTION
+
+  VPC3PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC3
+      CidrBlock: 10.4.0.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: INSPECTION Public Subnet 1
+
+  VPC3PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC3
+      CidrBlock: 10.4.4.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: INSPECTION Private Subnet 3
+
+  VPC3PrivateSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC3
+      CidrBlock: 10.4.5.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]  
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name 
+          Value: INSPECTION Private Subnet 4
+
+  VPC3PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC3
+      Tags:
+        - Key: Name
+          Value: Private Route Table (VPC3)
+
+  VPC3DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: NatGateway3
+    Properties:
+      RouteTableId: !Ref VPC3PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway3
+  
+  VPC3PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC3PrivateSubnet3
+      RouteTableId: !Ref VPC3PrivateRouteTable1
+  
+  VPC3PrivateSubnet4RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC3PrivateSubnet4
+      RouteTableId: !Ref VPC3PrivateRouteTable1
+
+  InternetGateway3:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: INSPECTION IGW
+
+  VPCGatewayAttachment3:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC3
+      InternetGatewayId: !Ref InternetGateway3
+
+  VPC3PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC3
+      Tags:
+        - Key: Name
+          Value: Public Route Table (VPC3)
+
+  VPC3DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment3
+    Properties:
+      RouteTableId: !Ref VPC3PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway3
+
+  NatGateway3:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEIP3.AllocationId
+      SubnetId: !Ref VPC3PublicSubnet1
+
+  NatEIP3:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGateway3
+    Properties:
+      Domain: vpc
+
+  VPC3PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC3PublicSubnet1
+      RouteTableId: !Ref VPC3PublicRouteTable1
+  
+  SecurityGroup1:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable all inbound access from 10.0.0.0/8
+      VpcId: !Ref VPC3
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: 0  
+          ToPort: 65535
+          CidrIp: 10.0.0.0/8
+
+  
+  ClientVPNMutualAuth1:
+    Type: AWS::EC2::ClientVpnEndpoint
+    Properties:
+      AuthenticationOptions: 
+        - MutualAuthentication: 
+            ClientRootCertificateChainArn: arn:aws:acm:eu-west-1:232623744602:certificate/1998b9d2-8431-4e5a-8412-c59c57f1780d
+          Type: certificate-authentication
+      ClientCidrBlock: 172.19.0.0/16
+      ConnectionLogOptions:
+        Enabled: False
+      SecurityGroupIds: 
+        - !Ref SecurityGroup1 
+      ServerCertificateArn: arn:aws:acm:eu-west-1:232623744602:certificate/6b08b6cb-f027-4a48-87f1-9b9ba0743624
+      TransportProtocol: udp
+      VpcId: !Ref VPC3
+
+  MutualAuth1ClientVPNRoute1:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: MutualAuth1ClientVpnTargetNetworkAssociation1
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth1
+      DestinationCidrBlock: 10.0.0.0/8
+      TargetVpcSubnetId: !Ref VPC3PrivateSubnet3
+
+  MutualAuth1ClientVPNRoute2:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: MutualAuth1ClientVpnTargetNetworkAssociation1
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth1
+      DestinationCidrBlock: 8.8.8.8/32
+      TargetVpcSubnetId: !Ref VPC3PrivateSubnet3
+
+  MutualAuth1ClientVpnTargetNetworkAssociation1:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth1
+      SubnetId: !Ref VPC3PrivateSubnet3
+
+  MutualAuth1ClientVpnAuthorizationRule1:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth1
+      AuthorizeAllGroups: true
+      TargetNetworkCidr: 0.0.0.0/0
+
+  ClientVPNMutualAuth2:
+    Type: AWS::EC2::ClientVpnEndpoint
+    Properties:
+      AuthenticationOptions: 
+        - MutualAuthentication: 
+            ClientRootCertificateChainArn: arn:aws:acm:eu-west-1:232623744602:certificate/6b08b6cb-f027-4a48-87f1-9b9ba0743624
+          Type: certificate-authentication
+      ClientCidrBlock: 172.19.0.0/16
+      ConnectionLogOptions:
+        Enabled: False
+      DnsServers: 
+        - 10.4.0.2
+        - 8.8.8.8
+      SecurityGroupIds: 
+        - !Ref SecurityGroup1 
+      ServerCertificateArn: arn:aws:acm:eu-west-1:232623744602:certificate/6b08b6cb-f027-4a48-87f1-9b9ba0743624
+      SplitTunnel: True
+      TransportProtocol: tcp
+      VpcId: !Ref VPC3
+
+  MutualAuth2ClientVPNRoute1:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: MutualAuth2ClientVpnTargetNetworkAssociation1
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth2
+      DestinationCidrBlock: 10.0.0.0/8
+      TargetVpcSubnetId: !Ref VPC3PrivateSubnet3
+
+  MutualAuth2ClientVPNRoute2:
+    Type: AWS::EC2::ClientVpnRoute
+    DependsOn: MutualAuth2ClientVpnTargetNetworkAssociation1
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth2
+      DestinationCidrBlock: 8.8.8.8/32
+      TargetVpcSubnetId: !Ref VPC3PrivateSubnet3
+
+  MutualAuth2ClientVpnTargetNetworkAssociation1:
+    Type: AWS::EC2::ClientVpnTargetNetworkAssociation
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth2
+      SubnetId: !Ref VPC3PrivateSubnet3
+
+  MutualAuth2ClientVpnAuthorizationRule1:
+    Type: AWS::EC2::ClientVpnAuthorizationRule
+    Properties:
+      ClientVpnEndpointId: !Ref ClientVPNMutualAuth2
+      AuthorizeAllGroups: true
+      TargetNetworkCidr: 0.0.0.0/0
+

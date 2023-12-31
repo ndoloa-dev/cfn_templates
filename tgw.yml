@@ -1,0 +1,428 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation Template for deploying TGW
+
+Parameters:
+  LatestAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+  MyPublicIP32:
+    Type: String
+    Default: ""  
+  KeyName:
+    Type: String
+    Default: ""  
+
+Resources:
+  VPC4:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.5.0.0/16
+      InstanceTenancy: default
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name 
+          Value: LEGACY
+
+  VPC4PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC4
+      CidrBlock: 10.5.0.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: LEGACY Public Subnet 
+
+  VPC4PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC4
+      CidrBlock: 10.5.1.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: LEGACY Private Subnet 1
+
+  VPC4PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC4
+      CidrBlock: 10.5.2.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]  
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name 
+          Value: LEGACY Private Subnet 2
+
+  VPC4PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC4
+      CidrBlock: 10.5.3.0/24
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: LEGACY Private Subnet 3
+
+  VPC4PrivateSubnet4:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC4
+      CidrBlock: 10.5.4.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]  
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name 
+          Value: LEGACY Private Subnet 4
+
+  InternetGateway4:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: LEGACY IGW
+
+  VPCGatewayAttachment4:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC4
+      InternetGatewayId: !Ref InternetGateway4
+
+  VPC4PublicRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC4
+      Tags:
+        - Key: Name
+          Value: Public Route Table (VPC4)
+
+  VPC4DefaultPublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment4
+    Properties:
+      RouteTableId: !Ref VPC4PublicRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway4
+  
+  VPC4PublicRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: TGWVPCAttachment1
+    Properties:
+      RouteTableId: !Ref VPC4PublicRouteTable1
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref TransitGateway1
+
+  VPC4PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC4
+      Tags:
+        - Key: Name
+          Value: Private Route Table (VPC4)
+
+  VPC4DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: NatGateway4
+    Properties:
+      RouteTableId: !Ref VPC4PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway4
+
+  VPC4PrivateRoute2:
+    Type: AWS::EC2::Route
+    DependsOn: TGWVPCAttachment1
+    Properties:
+      RouteTableId: !Ref VPC4PrivateRouteTable1
+      DestinationCidrBlock: 10.0.0.0/8
+      TransitGatewayId: !Ref TransitGateway1
+
+  VPC4PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC4PublicSubnet1
+      RouteTableId: !Ref VPC4PublicRouteTable1
+
+  VPC4PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC4PrivateSubnet1
+      RouteTableId: !Ref VPC4PrivateRouteTable1
+
+  VPC4PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC4PrivateSubnet2
+      RouteTableId: !Ref VPC4PrivateRouteTable1
+  
+  VPC4PrivateSubnet3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC4PrivateSubnet3
+      RouteTableId: !Ref VPC4PrivateRouteTable1
+  
+  VPC4PrivateSubnet4RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref VPC4PrivateSubnet4
+      RouteTableId: !Ref VPC4PrivateRouteTable1
+
+  Instance4:
+    Type: AWS::EC2::Instance
+    Properties:
+      SubnetId: !Ref VPC4PublicSubnet1
+      ImageId: !Ref LatestAmiId
+      KeyName: !Ref KeyName
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref SecurityGroup4
+      IamInstanceProfile: !Ref SSMInstanceProfile
+      UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd
+            service httpd start
+            chkconfig httpd on
+            cd /var/www/html
+            touch index.html
+            echo "This response is from LEGACY Instance 1" > index.html
+      Tags:
+        - Key: Name
+          Value: LEGACY Instance1
+  
+  CSR1:
+    Type: AWS::EC2::Instance
+    Properties:
+      SubnetId: !Ref VPC4PublicSubnet1
+      ImageId: ami-0fe7e2e0f6ad8bd78
+      KeyName: !Ref KeyName
+      InstanceType: c5.large
+      SecurityGroupIds:
+        - !Ref SecurityGroup4
+      IamInstanceProfile: !Ref SSMInstanceProfile
+      Tags:
+        - Key: Name
+          Value: CSR1
+
+  SecurityGroup4:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow all inbound connectiivty from 10.0.0.0/8
+      VpcId: !Ref VPC4
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          FromPort: 0  
+          ToPort: 65535
+          CidrIp: 10.0.0.0/8
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyPublicIP32
+
+  NatGateway4:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatEIP4.AllocationId
+      SubnetId: !Ref VPC4PublicSubnet1
+
+  NatEIP4:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGateway4
+    Properties:
+      Domain: vpc
+
+  SSMInterfaceEndpoint4:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC4
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref VPC4PrivateSubnet1
+      SecurityGroupIds:
+        - !Ref SecurityGroup4
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssm
+
+  SSMMessageInterfaceEndpoint4:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC4
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref VPC4PrivateSubnet1
+      SecurityGroupIds:
+        - !Ref SecurityGroup4
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ssmmessages
+
+  EC2MessageInterfaceEndpoint4:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VPC4
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref VPC4PrivateSubnet1
+      SecurityGroupIds:
+        - !Ref SecurityGroup4
+      VpcEndpointType: Interface
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.ec2messages
+  
+  SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+                Service:
+                  - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+          - arn:aws:iam::aws:policy/AmazonSSMPatchAssociation
+
+  SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref SSMRole
+
+  TransitGateway1:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      Description: TGW
+      AutoAcceptSharedAttachments: enable
+      DefaultRouteTableAssociation: enable
+      DefaultRouteTablePropagation: enable
+      DnsSupport: enable
+      VpnEcmpSupport: enable
+      TransitGatewayCidrBlocks:
+        - 10.253.0.0/16
+      Tags:
+        - Key: Name
+          Value: TGW
+
+  VPNGateway1:
+    Type: AWS::EC2::VPNGateway
+    Properties:
+      Type: ipsec.1
+
+  TGWVPCAttachment1:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      TransitGatewayId: !Ref TransitGateway1
+      SubnetIds: 
+        - !Ref VPC4PrivateSubnet1
+        - !Ref VPC4PrivateSubnet2
+      Tags: 
+        - Key: Segment
+          Value: LEGACY
+      VpcId: !Ref VPC4
+
+#  TGWRouteTable1:
+#    Type: AWS::EC2::TransitGatewayRouteTable
+#    Properties:
+#      TransitGatewayId: !Ref TransitGateway1
+  
+#  TGWRouteTableAssociation1:
+#   Type: AWS::EC2::TransitGatewayRouteTableAssociation
+#    Properties:
+#      TransitGatewayAttachmentId: !Ref TGWVPCAttachment1
+#      TransitGatewayRouteTableId: !Ref TGWRouteTable1
+  
+#  TGWRtbPropagation1:
+#    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+#    Properties:
+#      TransitGatewayAttachmentId: !Ref TGWVPCAttachment1
+#      TransitGatewayRouteTableId: !Ref TGWRouteTable1
+  
+  CustomerGateway1:
+    Type: AWS::EC2::CustomerGateway
+    Properties: 
+      BgpAsn: 65000
+      IpAddress: 3.220.248.193
+      Type: ipsec.1
+
+  CustomerGateway2:
+    Type: AWS::EC2::CustomerGateway
+    Properties: 
+      BgpAsn: 65000
+      IpAddress: 34.233.167.131
+      Type: ipsec.1
+
+  StaticVPNConnection1:
+    Type: AWS::EC2::VPNConnection
+    Properties:
+      CustomerGatewayId: !Ref CustomerGateway1
+      TransitGatewayId: !Ref TransitGateway1
+      Type: ipsec.1
+      StaticRoutesOnly: true
+
+  StaticVPNConnection2:
+    Type: AWS::EC2::VPNConnection
+    Properties:
+      CustomerGatewayId: !Ref CustomerGateway1
+      VpnGatewayId: !Ref VPNGateway1
+      Type: ipsec.1
+      StaticRoutesOnly: true
+  
+  StaticVPNConnectionRoute1:
+    Type: AWS::EC2::VPNConnectionRoute
+    Properties:
+      DestinationCidrBlock: 10.254.255.255/32
+      VpnConnectionId: !Ref StaticVPNConnection2
+      
+  DynamicVPNConnection1:
+    Type: AWS::EC2::VPNConnection
+    Properties:
+      CustomerGatewayId: !Ref CustomerGateway1
+      TransitGatewayId: !Ref TransitGateway1
+      Type: ipsec.1
+
+  DynamicVPNConnection2:
+    Type: AWS::EC2::VPNConnection
+    Properties:
+      CustomerGatewayId: !Ref CustomerGateway2
+      VpnGatewayId: !Ref VPNGateway1
+      Type: ipsec.1
+
+  VPC4TGWConnect1:
+    Type: AWS::EC2::TransitGatewayConnect
+    DependsOn: TGWVPCAttachment1
+    Properties:
+      Options: 
+        Protocol: gre
+      TransportTransitGatewayAttachmentId: !Ref TGWVPCAttachment1
+  
+  NetworkFirewall:
+    Type: AWS::NetworkFirewall::Firewall
+    Properties:
+      FirewallName: !Join
+        - "-"
+        - - "network-firewall"
+          - !Ref AWS::Region
+      FirewallPolicyArn: !GetAtt NetworkFirewallRulesPolicy.FirewallPolicyArn
+      SubnetMappings:
+        - SubnetId: !Ref VPC4PrivateSubnet3
+        - SubnetId: !Ref VPC4PrivateSubnet4
+      VpcId: !Ref VPC4
+  
+  NetworkFirewallRulesPolicy:
+    Type: AWS::NetworkFirewall::FirewallPolicy
+    Properties:
+      FirewallPolicy:
+        StatelessDefaultActions:
+          - "aws:pass"
+        StatelessFragmentDefaultActions:
+          - "aws:pass"
+      FirewallPolicyName: !Join
+        - "-"
+        - - "firewall-policy"
+          - !Ref AWS::Region

@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CloudFormation Template for deploying AWS CloudWAN global network and core network
+
+Resources:
+  GlobalNetwork:
+    Type: AWS::NetworkManager::GlobalNetwork  
+    Properties:
+      Description: Global network for core segments
+
+  CoreNetwork:
+    Type: AWS::NetworkManager::CoreNetwork 
+    Properties:
+      Description: My core network
+      GlobalNetworkId: !Ref GlobalNetwork
+      PolicyDocument:
+        version: "2021.12"
+        core-network-configuration:
+          vpn-ecmp-support: true
+          inside-cidr-blocks:
+            - "10.255.0.0/16"
+          asn-ranges:
+            - "64515-64520" 
+          edge-locations:
+            - location: us-east-1
+            - location: eu-west-1
+        segments:
+          - name: DEV
+            require-attachment-acceptance: false
+            edge-locations:
+              - us-east-1
+              - eu-west-1
+            deny-filter:
+              - PROD
+              - ONPREM
+          - name: INSPECTION
+            require-attachment-acceptance: false  
+            edge-locations:
+              - eu-west-1
+              - us-east-1
+          - name: PROD
+            require-attachment-acceptance: false 
+            edge-locations:
+              - eu-west-1
+              - us-east-1 
+            isolate-attachments: true
+            deny-filter:
+              - DEV
+              - ONPREM
+          - name: ONPREM
+            require-attachment-acceptance: false 
+            edge-locations:
+              - us-east-1
+              - eu-west-1
+            deny-filter:  
+              - DEV
+              - PROD
+          - name: LEGACY
+            require-attachment-acceptance: false
+            edge-locations:
+              - us-east-1
+              - eu-west-1
+            deny-filter:
+              - DEV
+              - ONPREM
+              - PROD
+        attachment-policies:
+          - rule-number: 100
+            condition-logic: and
+            conditions:
+              - type: tag-value
+                operator: equals
+                key: Segment
+                value: DEV
+            action:
+              association-method: constant
+              segment: DEV
+          - rule-number: 200  
+            condition-logic: and
+            conditions:
+              - type: tag-value
+                operator: equals
+                key: Segment
+                value: PROD
+            action:
+              association-method: constant
+              segment: PROD
+          - rule-number: 300
+            condition-logic: and
+            conditions:
+              - type: tag-value
+                operator: equals
+                key: Segment
+                value: INSPECTION
+            action:
+              association-method: constant
+              segment: INSPECTION
+          - rule-number: 400
+            condition-logic: and
+            conditions:
+              - type: tag-value
+                operator: equals
+                key: Segment
+                value: ONPREM
+            action:
+              association-method: constant
+              segment: ONPREM
+          - rule-number: 500
+            condition-logic: and
+            conditions:
+              - type: tag-value
+                operator: equals
+                key: Segment
+                value: LEGACY
+            action:
+              association-method: constant
+              segment: LEGACY   
